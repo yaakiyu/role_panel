@@ -174,7 +174,7 @@ async def hikitugi(interaction: discord.Interaction, message: discord.Message):
         panel_data[emoji] = role_id
     embed = discord.Embed(
         title=message.embeds[0].title,
-        description="\n".join(f"{k}:{v}" for k, v in panel_data.items())
+        description="\n".join(f"{k}:<@&{v}>" for k, v in panel_data.items())
     )
     view = views.RolePanelView(panel_data)
     try:
