@@ -5,7 +5,6 @@ import dotenv
 import os
 import utils
 import views
-import sqlite3
 
 dotenv.load_dotenv()
 
@@ -19,15 +18,6 @@ class MyClient(discord.Client):
         self.selecting: dict[int, discord.Message] = {}
 
     async def setup_hook(self):
-        print("setup database...")
-        conn = sqlite3.connect("panels.db")
-        cur = conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE name='panels'")
-        if cur.fetchone() is None:
-            cur.execute("CREATE TABLE panels(id)")
-        self.panels = {r[0] for r in cur.execute("SELECT id FROM panels")}
-        conn.close()
-
         print("sync commands...")
         await self.tree.sync()
 
@@ -37,7 +27,7 @@ client = MyClient()
 
 @client.event
 async def on_ready():
-    print("discord bot 役職パネルv.FanMade Ready.")
+    print("discord bot 役職パネルTest1 Ready.")
 
 
 # rpコマンドたち
@@ -61,7 +51,7 @@ async def create(
         )
 
     emoji = emoji or "\U0001f1e6"
-    desc = f"{emoji}{role.mention}"
+    desc = f"{emoji}:{role.mention}"
     cl = utils.get_color(color or "Default")
     if not 0 <= cl <= 16777215:
         return await interaction.response.send_message(
@@ -76,7 +66,7 @@ async def create(
     view = views.RolePanelView({emoji: role.id})
     try:
         message = await interaction.followup.send(embed=embed, view=view, wait=True)
-    except:
+    except discord.HTTPException:
         return await interaction.followup.send(
             "この絵文字はボタンとして使用できません。\n別の絵文字を指定してください。"
         )
@@ -159,7 +149,44 @@ client.tree.add_command(group)
 
 @client.tree.context_menu(name="パネル引継ぎ")
 async def hikitugi(interaction: discord.Interaction, message: discord.Message):
-    await interaction.response.send_message("開発中...", ephemeral=True)
+    if not (message.embeds and message.embeds[0].description):
+        return await interaction.response.send_message(
+            "これはパネルではないか、パネルのデータが失われています。", ephemeral=True
+        )
+    if message.author == client.user:
+        return await interaction.response.send_message(
+            "パネルはこのbotのものなので引き継ぐ必要がありません。", ephemeral=True
+        )
+    await interaction.response.defer()
+    raw_data = message.embeds[0].description.splitlines()
+    panel_data = {}
+    for item in raw_data:
+        if len(item.split(":")) != 2:
+            return await interaction.followup.send(
+                "正しいパネル形式ではありません。", ephemeral=True
+            )
+        emoji, role_mention = item.split(":")
+        role_id = role_mention.split("&")[1].replace(">", "")
+        if not role_id.isdigit():
+            return await interaction.followup.send(
+                "正しいパネル形式ではありません。", ephemeral=True
+            )
+        panel_data[emoji] = role_id
+    embed = discord.Embed(
+        title=message.embeds[0].title,
+        description="\n".join(f"{k}:{v}" for k, v in panel_data.items())
+    )
+    view = views.RolePanelView(panel_data)
+    try:
+        message = await interaction.followup.send(embed=embed, view=view, wait=True)
+    except discord.HTTPException:
+        return await interaction.followup.send(
+            "絵文字が対応していないなどの理由で役職パネルの引継ぎに失敗しました。"
+        )
+    client.add_view(view, message_id=message.id)
+
+    # パネルを選択
+    client.selecting[interaction.user.id] = message
 
 
 @client.tree.context_menu(name="パネル選択")
