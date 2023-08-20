@@ -4,6 +4,7 @@ from discord import app_commands
 import dotenv
 import os
 import utils
+import views
 import sqlite3
 
 dotenv.load_dotenv()
@@ -15,7 +16,7 @@ class MyClient(discord.Client):
         intents.typing = False
         super().__init__(intents=intents)
         self.tree = discord.app_commands.CommandTree(self)
-        self.selecting: dict[int, tuple[int, int, int]] = {}
+        self.selecting: dict[int, discord.Message] = {}
 
     async def setup_hook(self):
         print("setup database...")
@@ -72,12 +73,12 @@ async def create(
     )
     embed.set_footer(text="役職パネル")
     await interaction.response.defer()
-    message = await interaction.followup.send(embed=embed, wait=True)
-    await message.add_reaction(emoji)
+    view = views.RolePanelView({emoji: role.id})
+    message = await interaction.followup.send(embed=embed, view=view, wait=True)
+    client.add_view(view, message_id=message.id)
 
     # パネルを選択
-    client.selecting[interaction.user.id] = (
-        interaction.guild.id, interaction.channel.id, message.id)  # type: ignore
+    client.selecting[interaction.user.id] = message
 
 
 @group.command(description="選択したパネルをコピーします。")
@@ -135,7 +136,9 @@ async def selected(interaction: discord.Interaction):
     if interaction.user.id not in client.selecting:
         await interaction.response.send_message("あなたは現在パネルを選択していません。", ephemeral=True)
         return
-    await interaction.response.send_message(f"あなたは以下のパネルを選択しています。\n{utils.make_url(*client.selecting[interaction.user.id])}", ephemeral=True)
+    await interaction.response.send_message(
+        f"あなたは以下のパネルを選択しています。\n{client.selecting[interaction.user.id].jump_url}", ephemeral=True
+    )
 
 
 @group.command(description="選択したパネルのリアクションをつけ直します。")
@@ -158,18 +161,11 @@ async def hikitugi(interaction: discord.Interaction, message: discord.Message):
 async def select(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer()
     # パネルを選択
-    client.selecting[interaction.user.id] = (
-        message.guild.id, message.channel.id, message.id)  # type: ignore
+    client.selecting[interaction.user.id] = message
     await interaction.followup.send(
-        f"以下のパネルを選択しました。\n{utils.make_url(*client.selecting[interaction.user.id])}"
+        f"以下のパネルを選択しました。\n{message.jump_url}"
     )
 
 
-# 実際のイベント
-@client.event
-async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
-    if payload.message_id not in client.panels:
-        return
-
-
+# 実際の役職付与はview.pyで行っています。
 client.run(token=os.environ["TOKEN"])
