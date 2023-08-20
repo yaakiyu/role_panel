@@ -44,7 +44,7 @@ async def on_ready():
 group = app_commands.Group(name="rp", description="役職パネル関連のコマンドです。")
 
 
-@group.command(description="新しいパネルを作成し、そのパネルを選択します。")
+@group.command(description="パネルを新しく作成します。")
 @app_commands.describe(
     role="パネルに最初に追加する役職です。",
     emoji="最初に追加する役職の絵文字です。指定しなければABC絵文字が使用されます。",
@@ -74,7 +74,12 @@ async def create(
     embed.set_footer(text="役職パネル")
     await interaction.response.defer()
     view = views.RolePanelView({emoji: role.id})
-    message = await interaction.followup.send(embed=embed, view=view, wait=True)
+    try:
+        message = await interaction.followup.send(embed=embed, view=view, wait=True)
+    except:
+        return await interaction.followup.send(
+            "この絵文字はボタンとして使用できません。\n別の絵文字を指定してください。"
+        )
     client.add_view(view, message_id=message.id)
 
     # パネルを選択
@@ -160,10 +165,12 @@ async def hikitugi(interaction: discord.Interaction, message: discord.Message):
 @client.tree.context_menu(name="パネル選択")
 async def select(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer()
-    # パネルを選択
+    if message.author != client.user or not message.embeds or not message.components:
+        return await interaction.response.send_message("これは役職パネルではありません。", ephemeral=True)
+
     client.selecting[interaction.user.id] = message
     await interaction.followup.send(
-        f"以下のパネルを選択しました。\n{message.jump_url}"
+        f"以下のパネルを選択しました。\n{message.jump_url}", ephemeral=True
     )
 
 

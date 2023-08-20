@@ -19,15 +19,28 @@ class RoleButton(discord.ui.Button):
     custom_id: str
 
     async def callbacker(self, interaction: discord.Interaction):
-        try:
-            assert isinstance(interaction.user, discord.Member)
-            await interaction.user.add_roles(
-                discord.Object(int(self.custom_id))
+        if not isinstance(interaction.user, discord.Member):
+            return await interaction.response.send_message(
+                "サーバーの取得に失敗しました。もう一度ボタンを押してください。"
             )
+        huyo = True
+        for r in interaction.user.roles:
+            if r.id == int(self.custom_id):
+                huyo = False
+        try:
+            if huyo:
+                await interaction.user.add_roles(
+                    discord.Object(int(self.custom_id))
+                )
+            else:
+                await interaction.user.remove_roles(
+                    discord.Object(int(self.custom_id))
+                )
         except discord.Forbidden:
             embed = discord.Embed(description="役職の設定に失敗しました。\nBOTの一番上の役職よりも高い役職をつけようとしてるかも？")
         except discord.HTTPException:
-            embed = discord.Embed(description="役職の設定に失敗しました。")
+            embed = discord.Embed(description="役職が存在しないか、見つかりませんでした。")
         else:
-            embed = discord.Embed(description=f"<@&{self.custom_id}>の役職を付与しました。")
+            x = "付与" if huyo else "解除"
+            embed = discord.Embed(description=f"<@&{self.custom_id}>の役職を{x}しました。")
         await interaction.response.send_message(embed=embed, ephemeral=True)

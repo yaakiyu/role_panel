@@ -67,8 +67,3 @@ def get_color(cl: str) -> int:
         return int(x, 16)
     except:
         return -1
-
-
-def make_url(guild_id, channel_id, message_id):
-    "メッセージへのURLを作成し、返します。"
-    return f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
