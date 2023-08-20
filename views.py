@@ -18,7 +18,7 @@ class RolePanelView(discord.ui.View):
 class RoleButton(discord.ui.Button):
     custom_id: str
 
-    async def callback(self, interaction: discord.Interaction):
+    async def callbacker(self, interaction: discord.Interaction):
         try:
             assert isinstance(interaction.user, discord.Member)
             await interaction.user.add_roles(
@@ -29,5 +29,5 @@ class RoleButton(discord.ui.Button):
         except discord.HTTPException:
             embed = discord.Embed(description="役職の設定に失敗しました。")
         else:
-            embed = discord.Embed(description=f"<&@{self.custom_id}>の役職を付与しました。")
+            embed = discord.Embed(description=f"<@&{self.custom_id}>の役職を付与しました。")
         await interaction.response.send_message(embed=embed, ephemeral=True)

@@ -168,4 +168,15 @@ async def select(interaction: discord.Interaction, message: discord.Message):
 
 
 # 実際の役職付与はview.pyで行っています。
+
+@client.event
+async def on_interaction(interaction: discord.Interaction):
+    if interaction.type != discord.InteractionType.component:
+        return
+    if not interaction.data or "custom_id" not in interaction.data:
+        return
+    button = views.RoleButton(custom_id=interaction.data["custom_id"])
+    await button.callbacker(interaction)
+
+
 client.run(token=os.environ["TOKEN"])
