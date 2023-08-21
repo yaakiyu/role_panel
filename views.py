@@ -3,7 +3,7 @@ import discord
 
 
 class RolePanelView(discord.ui.View):
-    def __init__(self, roles: dict[str, str | int]):
+    def __init__(self, roles: dict[str, int] | dict[str, str]):
         super().__init__(timeout=None)
         self.roles = roles
         for k, v in roles.items():

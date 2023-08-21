@@ -50,7 +50,7 @@ async def create(
             "テキストチャンネルで実行してください！", ephemeral=True
         )
 
-    emoji = emoji or "\U0001f1e6"
+    emoji = emoji or chr(utils.unicode_a)
     desc = f"{emoji}:{role.mention}"
     cl = utils.get_color(color or "Default")
     if not 0 <= cl <= 16777215:
@@ -80,7 +80,11 @@ async def create(
 async def copy(interaction: discord.Interaction):
     if interaction.user.id not in client.selecting:
         return await interaction.response.send_message("あなたは現在パネルを選択していません。", ephemeral=True)
-    await interaction.response.send_message("開発中...", ephemeral=True)
+    if not isinstance(interaction.channel, discord.TextChannel):
+        return await interaction.response.send_message("テキストチャンネルで実行してください。", ephemeral=True)
+    view = views.RolePanelView.from_message(client.selecting[interaction.user.id])
+    await interaction.channel.send(embed=client.selecting[interaction.user.id].embeds[0], view=view)
+    await interaction.response.send_message("コピーしました。", ephemeral=True)
 
 
 @group.command(description="選択したパネルを削除します。")
@@ -96,14 +100,42 @@ async def add(
     role3: Optional[discord.Role] = None, role4: Optional[discord.Role] = None, role5: Optional[discord.Role] = None,
     role6: Optional[discord.Role] = None, role7: Optional[discord.Role] = None, role8: Optional[discord.Role] = None,
     role9: Optional[discord.Role] = None, role10: Optional[discord.Role] = None,
-    emoji1: Optional[discord.Role] = None, emoji2: Optional[discord.Role] = None,
-    emoji3: Optional[discord.Role] = None, emoji4: Optional[discord.Role] = None, emoji5: Optional[discord.Role] = None,
-    emoji6: Optional[discord.Role] = None, emoji7: Optional[discord.Role] = None, emoji8: Optional[discord.Role] = None,
-    emoji9: Optional[discord.Role] = None, emoji10: Optional[discord.Role] = None
+    emoji1: Optional[str] = None, emoji2: Optional[str] = None,
+    emoji3: Optional[str] = None, emoji4: Optional[str] = None, emoji5: Optional[str] = None,
+    emoji6: Optional[str] = None, emoji7: Optional[str] = None, emoji8: Optional[str] = None,
+    emoji9: Optional[str] = None, emoji10: Optional[str] = None
 ):
     if interaction.user.id not in client.selecting:
         return await interaction.response.send_message("あなたは現在パネルを選択していません。", ephemeral=True)
-    await interaction.response.send_message("開発中...", ephemeral=True)
+    roles = [role1, role2, role3, role4, role5, role6, role7, role8, role9, role10]
+    emojis = [emoji1, emoji2, emoji3, emoji4, emoji5, emoji6, emoji7, emoji8, emoji9, emoji10]
+    panel_data = utils.get_panel_data_from_content(
+        client.selecting[interaction.user.id].embeds[0].description or ""
+    )
+    if isinstance(panel_data, str):
+        return await interaction.followup.send(panel_data, ephemeral=True)
+    for i in range(10):
+        if not roles[i]:
+            continue
+        emoji = emojis[i] or utils.get_next_alphabet_int(panel_data.keys())
+        if emoji in panel_data:
+            return await interaction.response.send_message(
+                f"引数`emoji{i+1}`の絵文字は既に使用されています。", ephemeral=True
+            )
+        panel_data[emoji] = roles[i].id
+
+    embed = client.selecting[interaction.user.id].embeds[0].copy()
+    embed.description = (embed.description or "") + "\n" + "\n".join(
+        f"{k}:<@&{v}>" for k, v in panel_data.items()
+    )
+    view = views.RolePanelView(panel_data)
+    try:
+        await client.selecting[interaction.user.id].edit(embed=embed, view=view)
+    except discord.HTTPException:
+        return await interaction.response.send_message(
+            "ボタンとして使用できない絵文字がありました。\n別の絵文字を指定してください。"
+        )
+    await interaction.response.send_message("追加しました。", ephemeral=True)
 
 
 @group.command(description="選択したパネルのタイトルやカラーを変更します。")
@@ -157,30 +189,17 @@ async def hikitugi(interaction: discord.Interaction, message: discord.Message):
         return await interaction.response.send_message(
             "パネルはこのbotのものなので引き継ぐ必要がありません。", ephemeral=True
         )
-    await interaction.response.defer()
-    raw_data = message.embeds[0].description.splitlines()
-    panel_data = {}
-    for item in raw_data:
-        if len(item.split(":")) != 2:
-            return await interaction.followup.send(
-                "正しいパネル形式ではありません。", ephemeral=True
-            )
-        emoji, role_mention = item.split(":")
-        role_id = role_mention.split("&")[1].replace(">", "")
-        if not role_id.isdigit():
-            return await interaction.followup.send(
-                "正しいパネル形式ではありません。", ephemeral=True
-            )
-        panel_data[emoji] = role_id
-    embed = discord.Embed(
-        title=message.embeds[0].title,
-        description="\n".join(f"{k}:<@&{v}>" for k, v in panel_data.items())
+    panel_data = utils.get_panel_data_from_content(
+        message.embeds[0].description
     )
+    if isinstance(panel_data, str):
+        return await interaction.followup.send(panel_data, ephemeral=True)
     view = views.RolePanelView(panel_data)
     try:
-        message = await interaction.followup.send(embed=embed, view=view, wait=True)
+        message = await message.channel.send(embed=message.embeds[0], view=view)
+        await interaction.response.pong()
     except discord.HTTPException:
-        return await interaction.followup.send(
+        return await interaction.response.send_message(
             "絵文字が対応していないなどの理由で役職パネルの引継ぎに失敗しました。"
         )
     client.add_view(view, message_id=message.id)
@@ -191,12 +210,11 @@ async def hikitugi(interaction: discord.Interaction, message: discord.Message):
 
 @client.tree.context_menu(name="パネル選択")
 async def select(interaction: discord.Interaction, message: discord.Message):
-    await interaction.response.defer()
     if message.author != client.user or not message.embeds or not message.components:
         return await interaction.response.send_message("これは役職パネルではありません。", ephemeral=True)
 
     client.selecting[interaction.user.id] = message
-    await interaction.followup.send(
+    await interaction.response.send_message(
         f"以下のパネルを選択しました。\n{message.jump_url}", ephemeral=True
     )
 

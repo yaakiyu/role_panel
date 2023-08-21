@@ -1,5 +1,11 @@
 # role panel bot Utilities
+from typing import Iterable
+
 import random
+
+
+unicode_a = 0x1f1e6
+
 
 colors = {
     "default": 0x000000,
@@ -67,3 +73,27 @@ def get_color(cl: str) -> int:
         return int(x, 16)
     except:
         return -1
+
+
+def get_next_alphabet_int(emojis: Iterable[str]) -> str:
+    used = [False]*26
+    for emoji in emojis:
+        if len(emoji) == 1 and (ord(emoji)-unicode_a) < 26:
+            used[ord(emoji)-unicode_a] = True
+    for i in range(25):
+        if used[i]:
+            return chr(unicode_a+i)
+    return chr(unicode_a+26)
+
+def get_panel_data_from_content(content: str) -> dict[str, int] | str:
+    raw_data = content.splitlines()
+    panel_data = {}
+    for item in raw_data:
+        if len(item.split(":")) != 2:
+            return "正しいパネル形式ではありません。"
+        emoji, role_mention = item.split(":")
+        role_id = role_mention.split("&")[1].replace(">", "")
+        if not role_id.isdigit():
+            return "正しいパネル形式ではありません。"
+        panel_data[emoji] = int(role_id)
+    return panel_data or "正しいパネル形式ではありません。"
