@@ -125,9 +125,7 @@ async def add(
         panel_data[emoji] = roles[i].id
 
     embed = client.selecting[interaction.user.id].embeds[0].copy()
-    embed.description = (embed.description or "") + "\n" + "\n".join(
-        f"{k}:<@&{v}>" for k, v in panel_data.items()
-    )
+    embed.description = "\n".join(f"{k}:<@&{v}>" for k, v in panel_data.items())
     view = views.RolePanelView(panel_data)
     try:
         await client.selecting[interaction.user.id].edit(embed=embed, view=view)
@@ -196,21 +194,22 @@ async def hikitugi(interaction: discord.Interaction, message: discord.Message):
         return await interaction.followup.send(panel_data, ephemeral=True)
     view = views.RolePanelView(panel_data)
     try:
-        message = await message.channel.send(embed=message.embeds[0], view=view)
-        await interaction.response.pong()
+        msg = await message.channel.send(embed=message.embeds[0], view=view)
+        await interaction.response.send_message("引継ぎしました。", ephemeral=True)
     except discord.HTTPException:
         return await interaction.response.send_message(
             "絵文字が対応していないなどの理由で役職パネルの引継ぎに失敗しました。"
         )
-    client.add_view(view, message_id=message.id)
+    else:
+        client.add_view(view, message_id=msg.id)
 
-    # パネルを選択
-    client.selecting[interaction.user.id] = message
+        # パネルを選択
+        client.selecting[interaction.user.id] = msg
 
 
 @client.tree.context_menu(name="パネル選択")
 async def select(interaction: discord.Interaction, message: discord.Message):
-    if message.author != client.user or not message.embeds or not message.components:
+    if message.author != client.user or not message.components:
         return await interaction.response.send_message("これは役職パネルではありません。", ephemeral=True)
 
     client.selecting[interaction.user.id] = message
