@@ -166,13 +166,6 @@ async def selected(interaction: discord.Interaction):
     )
 
 
-@group.command(description="選択したパネルのリアクションをつけ直します。")
-async def refresh(interaction: discord.Interaction):
-    if interaction.user.id not in client.selecting:
-        return await interaction.response.send_message("あなたは現在パネルを選択していません。", ephemeral=True)
-    await interaction.response.send_message("開発中...", ephemeral=True)
-
-
 client.tree.add_command(group)
 
 # メッセージメニューコマンド
